@@ -35,7 +35,7 @@ const userSchema = new mongoose.Schema({
   currency: {
     type: String,
     default: 'USD',
-    enum: ['USD', 'EUR', 'GBP', 'INR', 'CAD', 'AUD', 'JPY', 'CNY']
+    enum: ['USD', 'EUR', 'GBP', 'INR', 'CAD', 'AUD', 'JPY', 'CNY','BDT']
   },
   timezone: {
     type: String,
@@ -71,13 +71,26 @@ const userSchema = new mongoose.Schema({
     default: false
   },
   emailVerificationToken: String,
+  emailVerificationExpires: Date,
   passwordResetToken: String,
   passwordResetExpires: Date,
   lastLogin: Date,
   isActive: {
     type: Boolean,
     default: true
-  }
+  },
+  isTwoFactorEnabled: {
+    type: Boolean,
+    default: false
+  },
+  twoFactorSecret: String,
+  otpCode: String,
+  otpExpires: Date,
+  emailChangeOTP: String,
+  emailChangeOTPExpires: Date,
+  pendingEmail: String,
+  emailChangeToken: String,
+  emailChangeTokenExpires: Date
 }, {
   timestamps: true
 });
@@ -109,6 +122,80 @@ userSchema.methods.updateLastLogin = function() {
   return this.save();
 };
 
+// Generate email verification token
+userSchema.methods.generateEmailVerificationToken = function() {
+  const crypto = require('crypto');
+  const token = crypto.randomBytes(32).toString('hex');
+  this.emailVerificationToken = token;
+  this.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  return token;
+};
+
+// Generate password reset token
+userSchema.methods.generatePasswordResetToken = function() {
+  const crypto = require('crypto');
+  const token = crypto.randomBytes(32).toString('hex');
+  this.passwordResetToken = token;
+  this.passwordResetExpires = Date.now() + 60 * 60 * 1000; // 1 hour
+  return token;
+};
+
+// Generate OTP for 2FA
+userSchema.methods.generateOTP = function() {
+  const crypto = require('crypto');
+  const otp = crypto.randomInt(100000, 999999).toString(); // 6-digit OTP
+  this.otpCode = otp;
+  this.otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  return otp;
+};
+
+// Verify OTP for 2FA
+userSchema.methods.verifyOTP = function(code) {
+  if (!this.otpCode || !this.otpExpires) {
+    return false;
+  }
+  
+  if (this.otpExpires < Date.now()) {
+    return false;
+  }
+  
+  return this.otpCode === code;
+};
+
+// Clear OTP
+userSchema.methods.clearOTP = function() {
+  this.otpCode = undefined;
+  this.otpExpires = undefined;
+};
+
+// Generate OTP for email change
+userSchema.methods.generateEmailChangeOTP = function() {
+  const crypto = require('crypto');
+  const otp = crypto.randomInt(100000, 999999).toString(); // 6-digit OTP
+  this.emailChangeOTP = otp;
+  this.emailChangeOTPExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  return otp;
+};
+
+// Verify OTP for email change
+userSchema.methods.verifyEmailChangeOTP = function(code) {
+  if (!this.emailChangeOTP || !this.emailChangeOTPExpires) {
+    return false;
+  }
+  
+  if (this.emailChangeOTPExpires < Date.now()) {
+    return false;
+  }
+  
+  return this.emailChangeOTP === code;
+};
+
+// Clear email change OTP
+userSchema.methods.clearEmailChangeOTP = function() {
+  this.emailChangeOTP = undefined;
+  this.emailChangeOTPExpires = undefined;
+};
+
 // Get user profile (without sensitive data)
 userSchema.methods.getProfile = function() {
   const userObject = this.toObject();
@@ -116,6 +203,14 @@ userSchema.methods.getProfile = function() {
   delete userObject.emailVerificationToken;
   delete userObject.passwordResetToken;
   delete userObject.passwordResetExpires;
+  delete userObject.otpCode;
+  delete userObject.otpExpires;
+  delete userObject.twoFactorSecret;
+  delete userObject.emailChangeOTP;
+  delete userObject.emailChangeOTPExpires;
+  delete userObject.emailChangeToken;
+  delete userObject.emailChangeTokenExpires;
+  delete userObject.pendingEmail;
   return userObject;
 };
 

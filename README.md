@@ -26,12 +26,20 @@ This is the backend API for the Income & Expense Tracker application, built with
    PORT=5000
    MONGODB_URI=mongodb://localhost:27017/income-expense-app
    JWT_SECRET=your-super-secret-jwt-key-here
-   JWT_EXPIRE=7d
+   NODE_ENV=development
+
+   # Email Configuration (required for email verification and 2FA)
+   EMAIL_USER=your-gmail@gmail.com
+   EMAIL_PASS=your-16-character-app-password
+   FRONTEND_URI=http://localhost:3000
+
+   # Optional: Cloudinary for image uploads
    CLOUDINARY_CLOUD_NAME=your-cloudinary-cloud-name
    CLOUDINARY_API_KEY=your-cloudinary-api-key
    CLOUDINARY_API_SECRET=your-cloudinary-api-secret
-   NODE_ENV=development
    ```
+
+   **Note:** To set up email functionality, see [EMAIL_SETUP.md](./EMAIL_SETUP.md)
 
 3. **Start the server**
 
@@ -65,9 +73,11 @@ BackEnd/
 ├── middleware/         # Custom middleware
 │   └── auth.js         # Authentication middleware
 ├── utils/              # Utility functions
-│   └── generateToken.js # JWT token utilities
+│   ├── generateToken.js # JWT token utilities
+│   └── emailService.js  # Email service for verification & 2FA
 ├── server.js           # Main server file
-└── package.json        # Dependencies
+├── package.json        # Dependencies
+└── EMAIL_SETUP.md      # Email setup instructions
 ```
 
 ## 🔧 API Endpoints
@@ -79,6 +89,15 @@ BackEnd/
 - `POST /logout` - User logout
 - `GET /me` - Get current user
 - `PUT /password` - Update password
+- `GET /sessions` - Get active sessions
+- `POST /sessions/revoke` - Revoke current session
+- `GET /verify-email?token={token}` - Verify email with token
+- `POST /resend-verification` - Resend verification email
+- `POST /forgot-password` - Request password reset
+- `POST /reset-password` - Reset password with token
+- `POST /verify-otp` - Verify OTP for 2FA login
+- `POST /enable-2fa` - Enable two-factor authentication
+- `POST /disable-2fa` - Disable two-factor authentication
 
 ### Users (`/api/users`)
 
@@ -134,6 +153,13 @@ BackEnd/
   },
   isEmailVerified: Boolean,
   isActive: Boolean,
+  isTwoFactorEnabled: Boolean,
+  otpCode: String,
+  otpExpires: Date,
+  emailVerificationToken: String,
+  emailVerificationExpires: Date,
+  passwordResetToken: String,
+  passwordResetExpires: Date,
   createdAt: Date,
   updatedAt: Date
 }
@@ -183,6 +209,9 @@ BackEnd/
 
 - **JWT Authentication**: Secure token-based authentication
 - **Password Hashing**: bcryptjs for password security
+- **Two-Factor Authentication (2FA)**: Email-based OTP verification
+- **Email Verification**: Required on signup
+- **Password Reset**: Secure token-based reset flow
 - **Input Validation**: express-validator for request validation
 - **Rate Limiting**: Prevents API abuse
 - **CORS**: Configured for cross-origin requests
